@@ -3,17 +3,14 @@
  */
 package edu.neu.coe.info6205.util;
 
-import edu.neu.coe.info6205.sort.BaseHelper;
-import edu.neu.coe.info6205.sort.Helper;
-import edu.neu.coe.info6205.sort.SortWithHelper;
-import edu.neu.coe.info6205.sort.elementary.BubbleSort;
-import edu.neu.coe.info6205.sort.elementary.InsertionSort;
-import edu.neu.coe.info6205.sort.elementary.RandomSort;
-import edu.neu.coe.info6205.sort.elementary.ShellSort;
+import edu.neu.coe.info6205.sort.*;
+import edu.neu.coe.info6205.sort.elementary.*;
 import edu.neu.coe.info6205.sort.linearithmic.TimSort;
 import edu.neu.coe.info6205.sort.linearithmic.*;
+import org.ini4j.Ini;
 
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.time.LocalDateTime;
@@ -23,6 +20,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static edu.neu.coe.info6205.util.SortBenchmarkHelper.generateRandomLocalDateTimeArray;
@@ -37,12 +35,25 @@ public class SortBenchmark {
 
     public static void main(String[] args) throws IOException {
         Config config = Config.load(SortBenchmark.class);
-        logger.info("SortBenchmark.main: " + config.get("SortBenchmark", "version") + " with word counts: " + Arrays.toString(args));
-        if (args.length == 0) logger.warn("No word counts specified on the command line");
+
+        int minimum = 10000;
+        int maximum = 256000;
+
+        String strategy = config.get("sortbenchmark", "strategy");
+
+        logger.info("SortBenchmark.main: " + config.get("sortbenchmark", "version") + " with min: " + minimum + " max: " + maximum + " strategy: " + strategy);
+
         SortBenchmark benchmark = new SortBenchmark(config);
         benchmark.sortIntegersByShellSort(config.getInt("shellsort", "n", 100000));
-        benchmark.sortStrings(Arrays.stream(args).map(Integer::parseInt));
+//        benchmark.sortStrings(Arrays.stream(args).map(Integer::parseInt));
+        System.out.println("------------------------------------");
+        benchmark.sortStrings(IntStream.iterate(minimum, i -> i < maximum, i -> i * 2).boxed());
+        System.out.println("------------------------------------");
         benchmark.sortLocalDateTimes(config.getInt("benchmarkdatesorters", "n", 100000), config);
+
+//        System.out.println("------------------------------------");
+
+
     }
 
     public void sortLocalDateTimes(final int n, Config config) throws IOException {
@@ -100,6 +111,11 @@ public class SortBenchmark {
         if (isConfigBenchmarkStringSorter("quicksort"))
             runStringSortBenchmark(words, nWords, nRuns, new QuickSort_Basic<>(nWords, config), timeLoggersLinearithmic);
 
+        if (isConfigBenchmarkStringSorter("heapsort")) {
+            Helper<String> helper = HelperFactory.create("Heapsort", nWords, config);
+            runStringSortBenchmark(words, nWords, nRuns, new HeapSort<>(helper), timeLoggersLinearithmic);
+        }
+
         if (isConfigBenchmarkStringSorter("introsort"))
             runStringSortBenchmark(words, nWords, nRuns, new IntroSort<>(nWords, config), timeLoggersLinearithmic);
 
@@ -150,6 +166,11 @@ public class SortBenchmark {
 
         if (isConfigBenchmarkStringSorter("quicksort"))
             runStringSortBenchmark(words, nWords, nRuns, new QuickSort_Basic<>(nWords, config), timeLoggersLinearithmic);
+
+        if (isConfigBenchmarkStringSorter("heapsort")) {
+            Helper<String> helper = HelperFactory.create("Heapsort", nWords, config);
+            runStringSortBenchmark(words, nWords, nRuns, new HeapSort<>(helper), timeLoggersLinearithmic);
+        }
 
         if (isConfigBenchmarkStringSorter("introsort"))
             runStringSortBenchmark(words, nWords, nRuns, new IntroSort<>(nWords, config), timeLoggersLinearithmic);
@@ -251,6 +272,7 @@ public class SortBenchmark {
      */
     static void runStringSortBenchmark(String[] words, int nWords, int nRuns, SortWithHelper<String> sorter, UnaryOperator<String[]> preProcessor, TimeLogger[] timeLoggers) {
         new SorterBenchmark<>(String.class, preProcessor, sorter, words, nRuns, timeLoggers).run(nWords);
+        logger.info(sorter.getHelper().showStats());
         sorter.close();
     }
 
